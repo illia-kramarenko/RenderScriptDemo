@@ -6,6 +6,7 @@ Just a demo app with:
 - simple implementation of ScriptIntrinsicBlur.
 
 "RS C" - is "RenderScript Contrast"
+
 "JAVA C" - is "JAVA Contrast"
 
 ![alt tag](https://raw.githubusercontent.com/illia-kramarenko/RenderScriptDemo/master/demo.png)
