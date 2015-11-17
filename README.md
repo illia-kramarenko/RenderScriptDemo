@@ -5,8 +5,8 @@ Just a demo app with:
 - same contrast algorithm but with more efficient use of ScriptIntrinsicLUT
 - simple implementation of ScriptIntrinsicBlur.
 
-"RS C" - is "RenderScript Contrast"
+RS C - is "RenderScript Contrast"
 
-"JAVA C" - is "JAVA Contrast"
+JAVA C - is "JAVA Contrast"
 
 ![alt tag](https://raw.githubusercontent.com/illia-kramarenko/RenderScriptDemo/master/demo.png)
