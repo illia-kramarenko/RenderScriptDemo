@@ -5,4 +5,4 @@ Just a demo app with:
 - same contrast but with more efficient use of ScriptIntrinsicLUT
 - simple rimplementation of ScriptIntrinsicBlur.
 
-![alt tag](https%3A//drive.google.com/398e6eb5-263a-4ef9-915a-dcb97f2e4dc9)
+![alt tag](https://raw.githubusercontent.com/illia-kramarenko/RenderScriptDemo/master/demo.png)
