@@ -1,9 +1,6 @@
 #pragma version(1)
-#pragma rs java_package_name(com.android.example.hellocompute)
-
-//rs_allocation gIn;
-//rs_allocation gOut;
-//rs_script gScript;
+#pragma rs java_package_name(com.kramarenko.illia.renderscriptdemo)
+//#pragma rs_fp_relaxed
 
 void root(const uchar4 *v_in, uchar4 *v_out, const void *usrData, uint32_t x, uint32_t y) {
     float3 pixel = convert_float4(v_in[0]).rgb;
@@ -34,7 +31,3 @@ void root(const uchar4 *v_in, uchar4 *v_out, const void *usrData, uint32_t x, ui
 
     v_out->rgb = convert_uchar3(pixel);
 }
-
-//void filter() {
-//    rsForEach(gScript, gIn, gOut);
-//}

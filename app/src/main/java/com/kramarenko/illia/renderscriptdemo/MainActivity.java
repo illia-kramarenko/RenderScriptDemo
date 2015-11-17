@@ -3,16 +3,18 @@ package com.kramarenko.illia.renderscriptdemo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.support.v8.renderscript.ScriptIntrinsicBlur;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v8.renderscript.Allocation;
+import android.support.v8.renderscript.Element;
 import android.support.v8.renderscript.RenderScript;
+import android.support.v8.renderscript.ScriptIntrinsicLUT;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.android.example.hellocompute.ScriptC_contrast;
 import com.kramarenko.illia.renderscriptdemo.utils.BitmapUtil;
 
 //import android.renderscript.RenderScript;
@@ -27,12 +29,15 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
     private long mStartTime;
 
     private RenderScript mRS;
-    private ScriptC_contrast mScript;
+    private ScriptC_contrast mContrastScript;
     private Allocation mInAllocation;
     private Allocation mOutAllocation;
 
-    private int mNumOfThreads = 1;
-    private String threads = "Java Threads: ";
+    private ScriptIntrinsicLUT mLutScript;
+    private ScriptIntrinsicBlur mBlurScript;
+
+    private float mThreadsOrRadius = 1;
+    private String threads = "Java Threads/Radius: ";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,13 +52,16 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
         mThreads = (TextView) findViewById(R.id.threads);
         mThreadsInput = (EditText) findViewById(R.id.threadsInput);
 
-        mThreads.setText(threads + mNumOfThreads);
+        mThreads.setText(threads + mThreadsOrRadius);
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 initRS();
+                initLut();
+                initBlur();
                 makeBitmap();
+                initAllocations();
             }
         }).start();
 
@@ -61,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
 
     private void initRS() {
         mRS = RenderScript.create(MainActivity.this);
-        mScript = new ScriptC_contrast(mRS);
+        mContrastScript = new ScriptC_contrast(mRS);
     }
 
     private void makeBitmap() {
@@ -88,14 +96,43 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
     }
 
     public void onOkPressed(View view) {
-        mNumOfThreads = Integer.parseInt(mThreadsInput.getText().toString());
-        mThreads.setText(threads + mNumOfThreads);
+        mThreadsOrRadius = Float.parseFloat(mThreadsInput.getText().toString());
+        mThreads.setText(threads + mThreadsOrRadius);
     }
+
+    public void initLut() {
+        mLutScript = ScriptIntrinsicLUT.create(mRS, Element.U8_4(mRS));
+        for (int index = 0; index < 256; index++) {
+            int value = index;
+            if (value < 60) {
+                value = (int) (0.017 * (value * value));
+            } else {
+                value = (int) (((61.5 - Math.pow((9.08 - 0.035 * value), 2)) * 4) + 10);
+                if (value > 255)
+                    value = 255;
+            }
+            mLutScript.setRed(index, value);
+            mLutScript.setBlue(index, value);
+            mLutScript.setGreen(index, value);
+        }
+    }
+
+    public void initBlur() {
+        mBlurScript = ScriptIntrinsicBlur.create(mRS, Element.U8_4(mRS));
+    }
+
+    private void initAllocations() {
+        mInAllocation = Allocation.createFromBitmap(mRS, mInBitmap,
+                Allocation.MipmapControl.MIPMAP_NONE,
+                Allocation.USAGE_SCRIPT);
+        mOutAllocation = Allocation.createTyped(mRS, mInAllocation.getType());
+    }
+
 
     /** ============ Java Contrast ============ **/
     public void javaContrast(View view) {
         mStartTime = System.nanoTime();
-        BitmapUtil.javaImageContrastAsync(mInBitmap, this, mNumOfThreads);
+        BitmapUtil.javaImageContrastAsync(mInBitmap, this, (int) mThreadsOrRadius);
         mProgressBar.setVisibility(View.VISIBLE);
     }
 
@@ -130,12 +167,7 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
                 mInAllocation = Allocation.createFromBitmap(mRS, mInBitmap,
                         Allocation.MipmapControl.MIPMAP_NONE,
                         Allocation.USAGE_SCRIPT);
-                mOutAllocation = Allocation.createTyped(mRS, mInAllocation.getType());
-//                mScript.set_gIn(mInAllocation);
-//                mScript.set_gOut(mOutAllocation);
-//                mScript.set_gScript(mScript);
-//                mScript.invoke_filter();
-                mScript.forEach_root(mInAllocation, mOutAllocation);
+                mContrastScript.forEach_root(mInAllocation, mOutAllocation);
                 mOutAllocation.copyTo(mInBitmap);
 
                 final long nanoDelta = System.nanoTime() - mStartTime;
@@ -153,5 +185,76 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
                 });
             }
         }).start();
+    }
+
+    /** ============ Lut Contrast ============ **/
+
+    public void lutContrast(View view) {
+        mProgressBar.setVisibility(View.VISIBLE);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mStartTime = System.nanoTime();
+
+                mInAllocation = Allocation.createFromBitmap(mRS, mInBitmap,
+                        Allocation.MipmapControl.MIPMAP_NONE,
+                        Allocation.USAGE_SCRIPT);
+                mLutScript.forEach(mInAllocation, mOutAllocation);
+                mOutAllocation.copyTo(mInBitmap);
+
+                final long nanoDelta = System.nanoTime() - mStartTime;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mProgressBar.setVisibility(View.INVISIBLE);
+                        mImageView.setImageBitmap(mInBitmap);
+
+                        double sec = (double) nanoDelta / 1000000000.0D;
+                        String sDelta = String.format("%.9f", sec);
+                        mText2.setText(sDelta);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** ============ Blur ============ **/
+
+    public void rsBlur(View view) {
+        mProgressBar.setVisibility(View.VISIBLE);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mStartTime = System.nanoTime();
+
+                mInAllocation = Allocation.createFromBitmap(mRS, mInBitmap,
+                        Allocation.MipmapControl.MIPMAP_NONE,
+                        Allocation.USAGE_SCRIPT);
+
+                mBlurScript.setRadius(mThreadsOrRadius);
+                mBlurScript.setInput(mInAllocation);
+                mBlurScript.forEach(mOutAllocation);
+
+                mOutAllocation.copyTo(mInBitmap);
+
+                final long nanoDelta = System.nanoTime() - mStartTime;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mProgressBar.setVisibility(View.INVISIBLE);
+                        mImageView.setImageBitmap(mInBitmap);
+
+                        double sec = (double) nanoDelta / 1000000000.0D;
+                        String sDelta = String.format("%.9f", sec);
+                        mText2.setText(sDelta);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    public void nothing(View view) {
     }
 }
