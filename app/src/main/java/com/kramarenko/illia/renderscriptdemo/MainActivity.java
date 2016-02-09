@@ -3,11 +3,11 @@ package com.kramarenko.illia.renderscriptdemo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.support.v8.renderscript.ScriptIntrinsicBlur;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v8.renderscript.Allocation;
 import android.support.v8.renderscript.Element;
 import android.support.v8.renderscript.RenderScript;
+import android.support.v8.renderscript.ScriptIntrinsicBlur;
 import android.support.v8.renderscript.ScriptIntrinsicLUT;
 import android.view.View;
 import android.widget.EditText;
@@ -22,7 +22,7 @@ import com.kramarenko.illia.renderscriptdemo.utils.BitmapUtil;
 public class MainActivity extends AppCompatActivity implements ContrastExecutorCallback {
 
     private ImageView mImageView;
-    private Bitmap mInBitmap;
+    private Bitmap mInBitmap, mOutBitmap;
     private ProgressBar mProgressBar;
     private TextView mText1, mText2, mRes, mThreads;
     private EditText mThreadsInput;
@@ -30,6 +30,7 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
 
     private RenderScript mRS;
     private ScriptC_contrast mContrastScript;
+    private ScriptC_swirl mSwirlScript;
     private Allocation mInAllocation;
     private Allocation mOutAllocation;
 
@@ -58,6 +59,7 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
             @Override
             public void run() {
                 initRS();
+                initRsSwirl();
                 initLut();
                 initBlur();
                 makeBitmap();
@@ -70,6 +72,10 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
     private void initRS() {
         mRS = RenderScript.create(MainActivity.this);
         mContrastScript = new ScriptC_contrast(mRS);
+    }
+
+    private void initRsSwirl() {
+        mSwirlScript = new ScriptC_swirl(mRS);
     }
 
     private void makeBitmap() {
@@ -256,5 +262,41 @@ public class MainActivity extends AppCompatActivity implements ContrastExecutorC
     }
 
     public void nothing(View view) {
+        mProgressBar.setVisibility(View.VISIBLE);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+//                mOutBitmap = mInBitmap.copy(mInBitmap.getConfig(), true);
+                mStartTime = System.nanoTime();
+
+                mInAllocation = Allocation.createFromBitmap(mRS, mInBitmap,
+                        Allocation.MipmapControl.MIPMAP_NONE,
+                        Allocation.USAGE_SCRIPT);
+
+                mSwirlScript.set_width(mInBitmap.getWidth());
+                mSwirlScript.set_height(mInBitmap.getHeight());
+                mSwirlScript.set_gIn(mInAllocation);
+                mSwirlScript.set_gOut(mOutAllocation);
+                mSwirlScript.set_gScript(mSwirlScript);
+
+//                mSwirlScript.forEach_root(mInAllocation, mOutAllocation);
+                //mSwirlScript.invoke_filter();
+                mOutAllocation.copyTo(mInBitmap);
+
+                final long nanoDelta = System.nanoTime() - mStartTime;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mProgressBar.setVisibility(View.INVISIBLE);
+                        mImageView.setImageBitmap(mInBitmap);
+
+                        double sec = (double) nanoDelta / 1000000000.0D;
+                        String sDelta = String.format("%.9f", sec);
+                        mText2.setText(sDelta);
+                    }
+                });
+            }
+        }).start();
     }
 }

@@ -3,7 +3,7 @@
 //#pragma rs_fp_relaxed
 
 void root(const uchar4 *v_in, uchar4 *v_out, const void *usrData, uint32_t x, uint32_t y) {
-    float3 pixel = convert_float4(v_in[0]).rgb;
+    uchar3 pixel = v_in[0].rgb;
 
     if (pixel.r < 60) {
         pixel.r = (int) (0.017 * (pixel.r * pixel.r));
@@ -29,5 +29,5 @@ void root(const uchar4 *v_in, uchar4 *v_out, const void *usrData, uint32_t x, ui
             pixel.b = 255;
     }
 
-    v_out->rgb = convert_uchar3(pixel);
+    v_out->rgb = pixel;
 }
